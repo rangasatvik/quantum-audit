@@ -1,0 +1,9 @@
+# Quantum circuits and the local simulator
+qiskit
+qiskit-aer
+
+# Charts (histograms, research plots)
+matplotlib
+
+# Tests
+pytest

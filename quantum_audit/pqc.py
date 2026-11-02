@@ -90,7 +90,8 @@ def parse_server_hello(message):
     if not retry and selected == DRAFT:
         raise ValueError("server selected a draft key share that was not sent")
     return {"group": {HYBRID: "X25519MLKEM768", X25519: "X25519", DRAFT: "X25519Kyber768Draft00"}[selected],
-            "hello_retry_request": retry, "draft_accepted": True if selected == DRAFT else None}
+            "hello_retry_request": retry, "draft_requested": selected == DRAFT,
+            "draft_accepted": None}
 
 
 def _read_exact(connection, length):

@@ -15,9 +15,38 @@ RETRY = bytes.fromhex(
 )
 
 
+def test_client_hello_offers_groups_and_real_key_shares():
+    hello = pqc.client_hello("example.com")
+    assert hello[:3] == bytes.fromhex("160301")
+    assert int.from_bytes(hello[3:5], "big") == len(hello) - 5
+    assert hello[5] == 1
+    assert int.from_bytes(hello[6:9], "big") == len(hello) - 9
+    body = hello[9:]
+    offset = 35 + body[34]
+    cipher_length = int.from_bytes(body[offset:offset + 2], "big")
+    offset += 2 + cipher_length
+    offset += 1 + body[offset]
+    extension_length = int.from_bytes(body[offset:offset + 2], "big")
+    offset += 2
+    assert offset + extension_length == len(body)
+    extensions = {}
+    while offset < len(body):
+        kind = int.from_bytes(body[offset:offset + 2], "big")
+        size = int.from_bytes(body[offset + 2:offset + 4], "big")
+        offset += 4
+        extensions[kind] = body[offset:offset + size]
+        offset += size
+    assert extensions[10] == bytes.fromhex("000611ec001d6399")
+    shares = extensions[51]
+    assert int.from_bytes(shares[:2], "big") == len(shares) - 2
+    assert shares[2:6] == bytes.fromhex("11ec04c0")
+    assert shares[1222:1226] == bytes.fromhex("001d0020")
+    assert len(shares[1226:]) == 32
+
+
 def test_saved_server_hello():
     assert pqc.parse_server_hello(SERVER_HELLO) == {
-        "group": "X25519", "hello_retry_request": False, "draft_accepted": None}
+        "group": "X25519", "hello_retry_request": False, "draft_requested": False, "draft_accepted": None}
 
 
 def test_hybrid_server_hello():
@@ -27,7 +56,7 @@ def test_hybrid_server_hello():
 
 def test_saved_retry_flags_draft():
     assert pqc.parse_server_hello(RETRY) == {
-        "group": "X25519Kyber768Draft00", "hello_retry_request": True, "draft_accepted": True}
+        "group": "X25519Kyber768Draft00", "hello_retry_request": True, "draft_requested": True, "draft_accepted": None}
 
 
 @pytest.mark.parametrize("data", [SERVER_HELLO[:-1], SERVER_HELLO[:20], b"\x02\x00\x00\x00"])
@@ -69,7 +98,24 @@ def test_grading_and_report():
     assert grade(tls, observation)["overall_grade"] == "A"
     assert "not determined" in report(tls, observation)
     observation["group"] = "X25519"
-    assert grade(tls, observation)["overall_grade"] == "C"
+    assert grade(tls, observation)["overall_grade"] == "B"
+    tls["expiry"] = "2020-01-01T00:00:00+00:00"
+    assert grade(tls, observation)["overall_grade"] == "F"
+    assert grade(tls, observation)["next_step"] == "Renew the expired certificate."
     observation["host"] = "other.example"
     with pytest.raises(ValueError):
         grade(tls, observation)
+
+
+def test_weak_certificate_recommendation():
+    tls = {"host": "example.com", "certificate_key_type": "RSA", "certificate_key_size": 1024}
+    observation = {"host": "example.com", "group": "X25519MLKEM768"}
+    assert "weak certificate" in grade(tls, observation)["next_step"]
+    assert grade(tls, observation)["overall_grade"] == "D"
+
+
+def test_report_distinguishes_draft_request():
+    tls = {"host": "example.com", "certificate_key_type": "EC", "certificate_key_size": 256}
+    observation = {"host": "example.com", **pqc.parse_server_hello(RETRY)}
+    assert "requested, not negotiated" in report(tls, observation)
+    assert "acceptance unconfirmed" in report(tls, observation)

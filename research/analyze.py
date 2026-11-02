@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 
 
 ROOT = Path(__file__).resolve().parent.parent
+TLS_LEGACY = "no PQ (TLS 1.2 only)"
 
 
 def chart(labels, values, title, ylabel, destination, maximum=None):
@@ -32,7 +33,7 @@ def analyze(input_path, docs_path, findings_path):
     with input_path.open(newline="", encoding="utf-8") as source:
         rows = list(csv.DictReader(source))
     docs_path.mkdir(parents=True, exist_ok=True)
-    pq_rows = [row for row in rows if row.get("group") in ("X25519MLKEM768", "X25519", "X25519Kyber768Draft00") and row.get("hello_retry_request") != "True"]
+    pq_rows = [row for row in rows if row.get("group") in ("X25519MLKEM768", "X25519", "X25519Kyber768Draft00", TLS_LEGACY) and row.get("hello_retry_request") != "True"]
     categories = {row["category"]: [] for row in rows}
     for row in pq_rows:
         categories[row["category"]].append(row)
@@ -42,7 +43,7 @@ def analyze(input_path, docs_path, findings_path):
     percentages += [100 * sum(row["group"] == "X25519MLKEM768" for row in categories[label]) / len(categories[label]) if categories[label] else 0 for label in labels[1:]]
     if pq_rows:
         measured = [(label, value) for label, value in zip(labels, percentages) if label == "Overall" or categories[label]]
-        chart([item[0] for item in measured], [item[1] for item in measured], "Hybrid PQ key exchange among measured sites", "Sites (%)", docs_path / "pqc_adoption.png", 100)
+        chart([item[0] for item in measured], [item[1] for item in measured], "Hybrid PQ key exchange among classified sites", "Sites (%)", docs_path / "pqc_adoption.png", 100)
     else:
         figure, axis = plt.subplots(figsize=(9, 5))
         axis.text(0.5, 0.5, "No measurable key exchanges", ha="center", va="center")
@@ -56,15 +57,21 @@ def analyze(input_path, docs_path, findings_path):
         chart(sorted(counts), [counts[label] for label in sorted(counts)], title, "Sites", docs_path / filename)
     successful = sum(row.get("status") == "ok" for row in rows)
     failures = len(rows) - successful
-    pq_summary = (f"The hybrid X25519MLKEM768 group was selected by {hybrid} of {len(pq_rows)} sites with a measurable key exchange ({percentages[0]:.1f}%)."
+    pq_summary = (f"The hybrid X25519MLKEM768 group was selected by {hybrid} of {len(pq_rows)} classified sites ({percentages[0]:.1f}%)."
                   if pq_rows else "No sites had a measurable key exchange; an adoption percentage cannot be calculated.")
-    lines = ["# Research findings", "", f"The study contains {len(rows)} sites: {successful} complete results and {failures} incomplete or failed results.",
+    lines = ["# Research findings", "", f"The study contains {len(rows)} sites: {successful} classified and graded results and {failures} incomplete or failed results.",
              pq_summary,
              "", "## By category", ""]
     for label, percentage in zip(labels[1:], percentages[1:]):
         count = len(categories[label])
         selected = sum(row["group"] == "X25519MLKEM768" for row in categories[label])
-        lines.append(f"- {label}: {selected} of {count} measured sites ({percentage:.1f}%)." if count else f"- {label}: no measurable sites.")
+        lines.append(f"- {label}: {selected} of {count} classified sites ({percentage:.1f}%)." if count else f"- {label}: no classified sites.")
+    rates = dict(zip(labels, percentages))
+    if all(categories.get(label) for label in ("government", "universities", "healthcare", "banks", "tech", "shopping")):
+        if max(rates[label] for label in ("government", "universities", "healthcare", "banks")) < min(rates["tech"], rates["shopping"]):
+            lines.extend(["", "Government, universities, healthcare, and banks have lower measured rates than both tech and shopping in this sample. Category counts are small."])
+            if rates["banks"] > rates["Overall"]:
+                lines.append("Banks are above the overall rate despite trailing tech and shopping.")
     lines += ["", "## Other observations", ""]
     for field, label in (("overall_grade", "Grades"), ("tls_version", "TLS versions"), ("certificate_key_type", "Certificate keys")):
         counts = Counter(row[field] for row in rows if row.get(field))
@@ -73,13 +80,18 @@ def analyze(input_path, docs_path, findings_path):
     pq_failures = sum(bool(row.get("pqc_error")) for row in rows)
     tls_failures = sum(bool(row.get("tls_error")) for row in rows)
     retries = sum(row.get("hello_retry_request") == "True" for row in rows)
+    legacy = sum(row.get("group") == TLS_LEGACY for row in rows)
+    lines.append(f"- {legacy} sites were classified as no PQ after a TLS 1.2-or-older connection and an unsuccessful TLS 1.3 probe.")
     lines.append(f"- Incomplete measurements: {pq_failures} PQ probe errors, {tls_failures} certificate scan errors, and {retries} retry requests. These counts can overlap.")
+    incomplete_hosts = [row["host"] for row in rows if row.get("status") != "ok"]
+    if incomplete_hosts:
+        lines.append(f"- Unclassified hosts: {', '.join(incomplete_hosts)}. See the CSV for the underlying connection and certificate errors.")
     timestamps = sorted(row["timestamp"] for row in rows if row.get("timestamp"))
     if timestamps:
         lines.extend(["", f"Observations were collected from {timestamps[0]} to {timestamps[-1]} (UTC)."])
     lines += ["", "[Cloudflare](https://blog.cloudflare.com/post-quantum-visibility/) reported about 15% adoption on connections to origin servers; this study measures public-facing hosts, so the populations and methods differ and the percentages are not directly comparable.",
-              "", "Grades use the project's heuristic: 75% key-exchange score and 25% certificate score, with caps for weak or expired keys. They are not a comprehensive security assessment.",
-              "", "The ranked entries come from [Tranco list V354N](https://tranco-list.eu/list/V354N) (retrieved 2026-11-02); other entries were hand-picked. This is a small, non-random sample, not a representative estimate of all websites. Each host receives a raw PQ probe and a separate certificate handshake, paused between, with at least one second between hosts. The connections may reach different endpoints. A non-selected group may still be supported. The probe offers only TLS 1.3; a failed probe does not establish why negotiation failed. Failed and retry-request probes are excluded from the PQ percentage, not counted as negative results. The raw ServerHello is not authenticated; certificate verification failures are recorded separately.",
+              "", "Grades use the project's heuristic: 75% key-exchange score and 25% certificate score, with caps for weak or expired keys. TLS 1.2 with forward secrecy is graded C. They are not a comprehensive security assessment.",
+              "", "The ranked entries come from [Tranco list V354N](https://tranco-list.eu/list/V354N) (retrieved 2026-11-02); other entries were hand-picked. This is a small, non-random sample, not a representative estimate of all websites. Each host receives a raw PQ probe and a separate certificate handshake, paused between, with at least one second between hosts. The connections may reach different endpoints. A non-selected group may still be supported. The probe offers only TLS 1.3; a failed probe does not establish why negotiation failed. For this study, a protocol-alert or invalid-record probe failure combined with TLS 1.2 or older is classified as no PQ on the observed connection. This is an assumption, not proof that the host supports only TLS 1.2 or does not support PQ under other conditions. Network errors and retry requests are excluded. The raw ServerHello is not authenticated; certificate verification failures are recorded separately.",
               "", "Reproduce the study with `python research/scan_sites.py --timeout 5`, then `python research/analyze.py`. The scan overwrites `research/results.csv` and saves each row as it finishes.", ""]
     findings_path.write_text("\n".join(lines), encoding="utf-8")
 

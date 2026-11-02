@@ -147,8 +147,8 @@ hardware for final runs.
 
 ## 6. Ground rules
 
-1. **Passive only.** One normal TLS handshake per site. No port scanning, vulnerability probing, brute forcing,
-   or heavy traffic. This is the same information every browser sees.
+1. **Passive only.** At most two lightweight handshakes per host per scan: the PQ probe and one normal TLS connection,
+   with a short pause between them. No port scanning, vulnerability probing, brute forcing, or heavy traffic.
 2. **Polite batch scans.** Delays between sites; never hammer one host.
 3. **No secrets in the repo.** IBM token lives in an environment variable / `.env` (gitignored).
 4. **Honest claims.** Shor's only breaks *toy* keys today. The README says so clearly.
@@ -186,5 +186,6 @@ These override earlier sections where they conflict.
    vs. largest real machines over time.
 8. **Output formats:** terminal report, `--json` (JSON Lines), CSV; stretch: CycloneDX **CBOM** export.
 9. **Research scan:** use a public top-sites list (e.g. Tranco) + hand-picked categories; written rate-limit policy
-   (one handshake per host, ≥1 s delay, low concurrency); compare our % with Cloudflare's ~15% origin figure.
+   (at most two lightweight handshakes per host with a short pause, ≥1 s delay between hosts, low concurrency);
+   compare our % with Cloudflare's ~15% origin figure.
 10. **New stretch goals:** SSH key-exchange check (OpenSSH's ML-KEM hybrid), monthly re-scans → adoption-over-time chart.

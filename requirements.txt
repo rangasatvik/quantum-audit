@@ -1,9 +1,6 @@
-# Quantum circuits and the local simulator
+cryptography>=50
+certifi>=2024.2.2
+pytest>=8
 qiskit
 qiskit-aer
-
-# Charts (histograms, research plots)
 matplotlib
-
-# Tests
-pytest

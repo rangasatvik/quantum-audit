@@ -12,8 +12,9 @@ Vik is learning quantum computing and does not write the code himself. He must b
 - Point out anything you're unsure about instead of guessing.
 
 ## Hard rules
-1. **Passive scanning only.** At most one TLS handshake per host per scan, no port scanning, vulnerability probing,
-   brute forcing, or heavy traffic. Batch scans: ≥1 s delay between hosts, low concurrency.
+1. **Passive scanning only.** At most two lightweight handshakes per host per scan (the PQ probe plus one normal TLS
+   connection), with a short pause between them. No port scanning, vulnerability probing, brute forcing, or heavy
+   traffic. Batch scans: ≥1 s delay between hosts, low concurrency.
 2. **No secrets in the repo.** IBM Quantum tokens etc. come from environment variables / `.env` (gitignored).
 3. **Honest claims.** Shor's here only breaks toy keys (N = 15, 21). Never imply it can break real encryption.
 4. **Stay in your lane.** Only edit the files for the milestone/module you were assigned. If you need to change a file

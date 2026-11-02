@@ -19,6 +19,7 @@ Vik is learning quantum computing and does not write the code himself. He must b
 4. **Stay in your lane.** Only edit the files for the milestone/module you were assigned. If you need to change a file
    owned by another task, say so instead of editing it.
 5. **Small commits.** Commit after each working step with a clear message. Run tests before committing.
+6. **Commit as Vik only.** Do not add `Co-Authored-By` trailers or any AI attribution to commit messages or PR descriptions.
 
 ## Conventions
 - Python 3.10+, package code in `quantum_audit/`, tests in `tests/` (pytest), demos in `demos/`, research in `research/`.

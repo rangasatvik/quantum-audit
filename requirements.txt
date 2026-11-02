@@ -1,3 +1,6 @@
 cryptography>=42
 certifi>=2024.2.2
 pytest>=8
+qiskit
+qiskit-aer
+matplotlib

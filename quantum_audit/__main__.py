@@ -19,7 +19,7 @@ def main():
         print(f"Scan failed for {args.host}: {error}", file=sys.stderr)
         return 1
     if args.json:
-        print(json.dumps(result, indent=2))
+        print(json.dumps(result))
     else:
         for key, value in result.items():
             print(f"{key.replace('_', ' ').capitalize()}: {value}")

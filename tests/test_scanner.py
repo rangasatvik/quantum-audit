@@ -48,7 +48,9 @@ def test_cli_json(monkeypatch, capsys):
     monkeypatch.setattr(cli, "scan", lambda host: {"host": host})
     monkeypatch.setattr("sys.argv", ["quantum_audit", "scan", "example.com", "--json"])
     assert cli.main() == 0
-    assert json.loads(capsys.readouterr().out) == {"host": "example.com"}
+    output = capsys.readouterr().out
+    assert len(output.splitlines()) == 1
+    assert json.loads(output) == {"host": "example.com"}
 
 
 @pytest.mark.parametrize("error", [socket.timeout("timed out"), socket.gaierror("bad host"), ssl.SSLError("handshake failed")])

@@ -1,4 +1,4 @@
-cryptography>=42
+cryptography>=50
 certifi>=2024.2.2
 pytest>=8
 qiskit
